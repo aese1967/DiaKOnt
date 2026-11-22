@@ -1,0 +1,159 @@
+# Compila DiaKont para Android (.apk) y Windows (.exe + instalador).
+#
+# * Cada push a main y cada PR: tests + builds, descargables como "Artifacts".
+# * Al crear un tag vX.Y.Z (o con "Run workflow" marcando release): además
+#   publica un Release de GitHub con el APK y el instalador adjuntos.
+#
+# Secretos del repositorio (Settings > Secrets and variables > Actions):
+#   GOOGLE_WEB_CLIENT_ID, GOOGLE_DESKTOP_CLIENT_ID, GOOGLE_DESKTOP_CLIENT_SECRET,
+#   MICROSOFT_CLIENT_ID        -> ver docs/CONFIGURAR_OAUTH.md
+#   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS,
+#   ANDROID_KEY_PASSWORD       -> firma estable del APK (opcional, recomendada)
+# Sin los secretos de login la app compila igual y muestra una pantalla que
+# explica qué falta configurar.
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Publicar un Release con los binarios'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_CHANNEL: stable
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  android:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+      - name: Crear env.json desde los secretos
+        shell: bash
+        env:
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+          GOOGLE_DESKTOP_CLIENT_ID: ${{ secrets.GOOGLE_DESKTOP_CLIENT_ID }}
+          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
+          MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
+        run: |
+          python3 -c "import json,os; json.dump({k: os.environ.get(k,'') for k in ['GOOGLE_WEB_CLIENT_ID','GOOGLE_DESKTOP_CLIENT_ID','GOOGLE_DESKTOP_CLIENT_SECRET','MICROSOFT_CLIENT_ID']}, open('env.json','w'))"
+      - name: Configurar firma (si hay keystore)
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > android/app/diakont-release.jks
+            printf 'storeFile=diakont-release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+              "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > android/key.properties
+            echo "Firma de release configurada."
+          else
+            echo "::warning::Sin ANDROID_KEYSTORE_BASE64: el APK se firma con una clave de debug temporal."
+          fi
+      - run: flutter pub get
+      - run: flutter build apk --release --dart-define-from-file=env.json
+      - name: Renombrar APK
+        run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/DiaKont-${{ github.ref_type == 'tag' && github.ref_name || github.sha }}.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DiaKont-android-apk
+          path: build/app/outputs/flutter-apk/DiaKont-*.apk
+          if-no-files-found: error
+
+  windows:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+      - name: Crear env.json desde los secretos
+        shell: pwsh
+        env:
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+          GOOGLE_DESKTOP_CLIENT_ID: ${{ secrets.GOOGLE_DESKTOP_CLIENT_ID }}
+          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
+          MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
+        run: |
+          @{
+            GOOGLE_WEB_CLIENT_ID = "$env:GOOGLE_WEB_CLIENT_ID"
+            GOOGLE_DESKTOP_CLIENT_ID = "$env:GOOGLE_DESKTOP_CLIENT_ID"
+            GOOGLE_DESKTOP_CLIENT_SECRET = "$env:GOOGLE_DESKTOP_CLIENT_SECRET"
+            MICROSOFT_CLIENT_ID = "$env:MICROSOFT_CLIENT_ID"
+          } | ConvertTo-Json | Set-Content -Encoding utf8NoBOM env.json
+      - run: flutter pub get
+      - run: flutter build windows --release --dart-define-from-file=env.json
+      - name: Versión
+        id: ver
+        shell: bash
+        run: echo "version=$(grep '^version:' pubspec.yaml | sed 's/version: //; s/+.*//')" >> "$GITHUB_OUTPUT"
+      - name: Instalador (Inno Setup)
+        shell: pwsh
+        run: |
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) { choco install innosetup -y --no-progress }
+          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          & $iscc "/DAppVersion=${{ steps.ver.outputs.version }}" installer\diakont.iss
+      - name: Zip portable
+        shell: pwsh
+        run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath build\installer\DiaKont-${{ steps.ver.outputs.version }}-windows-portable.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DiaKont-windows
+          path: build/installer/*
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release)
+    needs: [android, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}
+          name: DiaKont ${{ github.ref_type == 'tag' && github.ref_name || format('build {0}', github.run_number) }}
+          prerelease: ${{ github.ref_type != 'tag' }}
+          files: dist/*
+          body: |
+            **DiaKont by Southdevs**
+            - `DiaKont-*.apk`: Android (instalar habilitando "Orígenes desconocidos").
+            - `DiaKont-Setup-*.exe`: instalador de Windows.
+            - `*-windows-portable.zip`: versión portable de Windows (descomprimir y ejecutar `diakont.exe`).
