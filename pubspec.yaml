@@ -130,11 +130,12 @@ flutter_launcher_icons:
 # Los 3 datos de identidad salen de Partner Center > DiaKont >
 # Administración de productos > Identidad del producto. Mientras sigan con
 # "PENDIENTE", el workflow no genera el paquete de la Store.
+# Id. de Store: 9MW0TC47MW6H · PFN: SouthDevs.DiaKont_24gh9dhnvbthr
 msix_config:
   display_name: DiaKont
-  publisher_display_name: South Devs  # debe coincidir con Partner Center
-  identity_name: PENDIENTE
-  publisher: CN=PENDIENTE
+  publisher_display_name: SouthDevs  # debe coincidir con Partner Center
+  identity_name: SouthDevs.DiaKont
+  publisher: CN=1F3D1627-A620-4346-8BD6-ABFA86A9401C
   logo_path: assets/icon/app_icon.png
   capabilities: internetClient
   languages: es-UY, es-ES, es
