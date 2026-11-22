@@ -1,56 +1,19 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../core/theme/app_theme.dart';
 
-/// Isotipo provisorio de DiaKont dibujado con widgets (el logo SVG definitivo
-/// llega en la Fase 4). Cuadrado redondeado azul con una "D" y un acento
-/// esmeralda en forma de barra de crecimiento.
+/// Isotipo de DiaKont (la "D" con barras de crecimiento sobre azul profundo).
 class BrandLogo extends StatelessWidget {
   const BrandLogo({super.key, this.size = 48});
   final double size;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Image.asset(
+      'assets/icon/logo_512.png',
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        gradient: BrandColors.heroGradient,
-        borderRadius: BorderRadius.circular(size * 0.28),
-        boxShadow: [
-          BoxShadow(
-            color: BrandColors.blue.withValues(alpha: 0.35),
-            blurRadius: size * 0.3,
-            offset: Offset(0, size * 0.1),
-          ),
-        ],
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Text(
-            'D',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: size * 0.56,
-              fontWeight: FontWeight.w800,
-              height: 1,
-            ),
-          ),
-          Positioned(
-            right: size * 0.2,
-            bottom: size * 0.2,
-            child: Container(
-              width: size * 0.14,
-              height: size * 0.14,
-              decoration: const BoxDecoration(
-                color: BrandColors.emerald,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-        ],
-      ),
+      filterQuality: FilterQuality.medium,
+      semanticLabel: 'DiaKont',
     );
   }
 }
