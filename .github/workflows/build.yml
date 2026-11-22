@@ -135,6 +135,17 @@ jobs:
           $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
           if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
           & $iscc "/DAppVersion=${{ steps.ver.outputs.version }}" installer\diakont.iss
+      - name: Paquete Microsoft Store (.msix)
+        shell: bash
+        run: |
+          if grep -q "identity_name: PENDIENTE" pubspec.yaml; then
+            echo "::notice::Identidad de Microsoft Store pendiente en pubspec.yaml (msix_config): se omite el .msix."
+          else
+            dart run msix:create --store --build-windows false \
+              --version "${{ steps.ver.outputs.version }}.0" \
+              --output-path build/installer \
+              --output-name "DiaKont-${{ steps.ver.outputs.version }}-store"
+          fi
       - name: Zip portable
         shell: pwsh
         run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath build\installer\DiaKont-${{ steps.ver.outputs.version }}-windows-portable.zip
@@ -164,3 +175,4 @@ jobs:
             - `DiaKont-*.apk`: Android (instalar habilitando "Orígenes desconocidos").
             - `DiaKont-Setup-*.exe`: instalador de Windows.
             - `*-windows-portable.zip`: versión portable de Windows (descomprimir y ejecutar `diakont.exe`).
+            - `*-store.msix`: paquete para subir a Microsoft Store desde Partner Center (no se instala directo).

@@ -67,6 +67,7 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
+  msix: ^3.18.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -124,3 +125,18 @@ flutter_launcher_icons:
     generate: true
     image_path: "assets/icon/app_icon.png"
     icon_size: 256
+
+# Paquete MSIX para Microsoft Store (lo genera GitHub Actions).
+# Los 3 datos de identidad salen de Partner Center > DiaKont >
+# Administración de productos > Identidad del producto. Mientras sigan con
+# "PENDIENTE", el workflow no genera el paquete de la Store.
+msix_config:
+  display_name: DiaKont
+  publisher_display_name: PENDIENTE
+  identity_name: PENDIENTE
+  publisher: CN=PENDIENTE
+  logo_path: assets/icon/app_icon.png
+  capabilities: internetClient
+  languages: es-UY, es-ES, es
+  store: true
+  build_windows: false
