@@ -18,7 +18,7 @@ class BrandLogo extends StatelessWidget {
   }
 }
 
-/// Logo + nombre "DiaKont by Southdevs".
+/// Logo + nombre "DiaKont by SouthDevs".
 class BrandLockup extends StatelessWidget {
   const BrandLockup({super.key, this.size = 44, this.light = false});
   final double size;
@@ -48,7 +48,7 @@ class BrandLockup extends StatelessWidget {
               ),
             ),
             Text(
-              'by Southdevs',
+              'by SouthDevs',
               style: TextStyle(
                 fontSize: size * 0.27,
                 color: color.withValues(alpha: 0.7),

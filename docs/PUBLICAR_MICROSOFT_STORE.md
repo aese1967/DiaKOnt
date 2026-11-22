@@ -8,7 +8,7 @@
 1. Entrá a https://storedeveloper.microsoft.com y tocá **Comenzar / Get started**.
 2. Iniciá sesión con tu cuenta Microsoft (la que vas a usar para administrar la app).
 3. Elegí **Individual** (desarrollador individual) y país **Uruguay**.
-4. Nombre para mostrar del editor: **Southdevs** (es lo que verá la gente como "editor").
+4. Nombre para mostrar del editor: **South Devs** (Microsoft no acepta "SouthDevs" junto; es lo que verá la gente como "editor").
 5. Completá la verificación de identidad (documento + selfie desde el celular). Suele aprobarse en minutos u horas.
 
 ## Paso 2. Reservar el nombre "DiaKont"
@@ -20,9 +20,9 @@ En la app recién creada: **Administración de productos > Identidad del product
 
 | En Partner Center | Ejemplo |
 |---|---|
-| Package/Identity/Name | `12345Southdevs.DiaKont` |
+| Package/Identity/Name | `12345SouthDevs.DiaKont` |
 | Package/Identity/Publisher | `CN=ABCD1234-...` |
-| Package/Properties/PublisherDisplayName | `Southdevs` |
+| Package/Properties/PublisherDisplayName | `South Devs` |
 
 Con eso actualizo `pubspec.yaml` y GitHub genera el archivo **`DiaKont-1.0.0-store.msix`** en el Release.
 

@@ -245,7 +245,7 @@ class SettingsScreen extends ConsumerWidget {
               const SizedBox(height: 24),
               Center(
                 child: Text(
-                  'DiaKont by Southdevs · v1.0.0',
+                  'DiaKont by SouthDevs · v1.0.0',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),

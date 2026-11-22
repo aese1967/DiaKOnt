@@ -1,4 +1,4 @@
-# Configurar el inicio de sesión (una sola vez, la hace Southdevs)
+# Configurar el inicio de sesión (una sola vez, la hace SouthDevs)
 
 DiaKont no tiene servidor. Cada usuario guarda sus datos en **su propio** Google Drive (carpeta oculta de la app) o en **su propio** OneDrive (carpeta `Aplicaciones/DiaKont`). Para eso, el desarrollador registra la app **una única vez** en Google y en Microsoft. **Los usuarios no tienen que hacer nada de esto**: solo tocan "Continuar con Google/Microsoft" y aceptan el permiso la primera vez en cada dispositivo.
 
@@ -41,7 +41,7 @@ Al terminar, copiá `env.example.json` a `env.json` y completá los 4 valores.
 
 ## Preguntas frecuentes
 
-**¿Cada usuario tiene que verificar algo?** No. La verificación la hace Southdevs una sola vez por proveedor. El usuario solo inicia sesión y acepta el permiso una vez por dispositivo.
+**¿Cada usuario tiene que verificar algo?** No. La verificación la hace SouthDevs una sola vez por proveedor. El usuario solo inicia sesión y acepta el permiso una vez por dispositivo.
 
 **¿DiaKont puede ver mis otros archivos?** No. Los permisos `drive.appdata` y `Files.ReadWrite.AppFolder` solo dan acceso a la carpeta propia de la app.
 

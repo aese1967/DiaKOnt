@@ -9,7 +9,7 @@ import 'core/config/env.dart';
 import 'data/auth/auth_service.dart';
 import 'state/providers.dart';
 
-/// Punto de entrada de DiaKont by Southdevs (Android y Windows).
+/// Punto de entrada de DiaKont by SouthDevs (Android y Windows).
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 

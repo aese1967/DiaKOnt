@@ -89,11 +89,11 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "Southdevs" "\0"
-            VALUE "FileDescription", "DiaKont by Southdevs" "\0"
+            VALUE "CompanyName", "SouthDevs" "\0"
+            VALUE "FileDescription", "DiaKont by SouthDevs" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "diakont" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 Southdevs. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 SouthDevs. All rights reserved." "\0"
             VALUE "OriginalFilename", "diakont.exe" "\0"
             VALUE "ProductName", "DiaKont" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"

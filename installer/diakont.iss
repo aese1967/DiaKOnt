@@ -1,4 +1,4 @@
-; Instalador de Windows para DiaKont by Southdevs (Inno Setup 6).
+; Instalador de Windows para DiaKont by SouthDevs (Inno Setup 6).
 ; Lo compila GitHub Actions; localmente: iscc /DAppVersion=1.0.0 installer\diakont.iss
 
 #ifndef AppVersion
@@ -10,7 +10,7 @@ AppId={{6B1E4C2A-8F3D-4D7A-9C51-D1A0C0FFEE01}
 AppName=DiaKont
 AppVersion={#AppVersion}
 AppVerName=DiaKont {#AppVersion}
-AppPublisher=Southdevs
+AppPublisher=SouthDevs
 DefaultDirName={autopf}\DiaKont
 DefaultGroupName=DiaKont
 DisableProgramGroupPage=yes

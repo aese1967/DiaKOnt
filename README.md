@@ -1,4 +1,4 @@
-# DiaKont by Southdevs
+# DiaKont by SouthDevs
 
 Contabilidad hogareña simple para **Android** y **Windows (.exe)**, con un único código Flutter, sincronización en tiempo real entre dispositivos y funcionamiento completo sin conexión.
 

@@ -2,7 +2,7 @@
 
 _Última actualización: 22 de noviembre de 2026_
 
-DiaKont es una aplicación de contabilidad hogareña desarrollada por **Southdevs** (Uruguay), disponible para Android y Windows.
+DiaKont es una aplicación de contabilidad hogareña desarrollada por **SouthDevs** (Uruguay), disponible para Android y Windows.
 
 ## Qué datos usa DiaKont
 - **Datos que vos cargás**: gastos, montos, IVA, categorías, grupos, notas y ajustes.
@@ -12,7 +12,7 @@ DiaKont es una aplicación de contabilidad hogareña desarrollada por **Southdev
 - En tu dispositivo, en una base de datos local.
 - En **tu propio** Google Drive (carpeta oculta de datos de la app) o **tu propio** OneDrive (carpeta "Aplicaciones/DiaKont"), para sincronizar tus dispositivos.
 
-**Southdevs no tiene servidores ni recibe, almacena, vende o comparte tus datos.** DiaKont solo pide acceso a su propia carpeta privada: no puede ver ni modificar tus otros archivos.
+**SouthDevs no tiene servidores ni recibe, almacena, vende o comparte tus datos.** DiaKont solo pide acceso a su propia carpeta privada: no puede ver ni modificar tus otros archivos.
 
 ## Terceros
 El inicio de sesión y el almacenamiento los brindan Google y Microsoft, según sus propias políticas de privacidad. DiaKont no incluye publicidad ni herramientas de seguimiento o analítica.

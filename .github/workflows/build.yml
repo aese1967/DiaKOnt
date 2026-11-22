@@ -171,7 +171,7 @@ jobs:
           prerelease: ${{ github.ref_type != 'tag' }}
           files: dist/*
           body: |
-            **DiaKont by Southdevs**
+            **DiaKont by SouthDevs**
             - `DiaKont-*.apk`: Android (instalar habilitando "Orígenes desconocidos").
             - `DiaKont-Setup-*.exe`: instalador de Windows.
             - `*-windows-portable.zip`: versión portable de Windows (descomprimir y ejecutar `diakont.exe`).

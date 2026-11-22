@@ -109,7 +109,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 Expanded(
                   child: Text(
                     'DiaKont solo accede a su propia carpeta privada: no puede ver '
-                    'ni modificar tus otros archivos. Southdevs no tiene servidores '
+                    'ni modificar tus otros archivos. SouthDevs no tiene servidores '
                     'ni copia de tus datos.',
                     style: theme.textTheme.bodySmall?.copyWith(color: muted),
                   ),
