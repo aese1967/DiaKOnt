@@ -84,8 +84,14 @@ jobs:
           fi
       - run: flutter pub get
       - run: flutter build apk --release --dart-define-from-file=env.json
-      - name: Renombrar APK
-        run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/DiaKont-${{ github.ref_type == 'tag' && github.ref_name || github.sha }}.apk
+      - name: Renombrar APK y mostrar huella de la firma
+        shell: bash
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //; s/+.*//')
+          APK=build/app/outputs/flutter-apk/DiaKont-${VERSION}-android.apk
+          mv build/app/outputs/flutter-apk/app-release.apk "$APK"
+          # La SHA-1 debe coincidir con la registrada en Google Cloud.
+          keytool -printcert -jarfile "$APK" | grep -E "SHA1|SHA256" || true
       - uses: actions/upload-artifact@v4
         with:
           name: DiaKont-android-apk
