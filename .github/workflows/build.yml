@@ -7,6 +7,7 @@
 # Secretos del repositorio (Settings > Secrets and variables > Actions):
 #   GOOGLE_WEB_CLIENT_ID, GOOGLE_DESKTOP_CLIENT_ID, GOOGLE_DESKTOP_CLIENT_SECRET,
 #   MICROSOFT_CLIENT_ID        -> ver docs/CONFIGURAR_OAUTH.md
+#   (tool/make_env.py los limpia y corta la build si alguno tiene mal formato)
 #   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS,
 #   ANDROID_KEY_PASSWORD       -> firma estable del APK (opcional, recomendada)
 # Sin los secretos de login la app compila igual y muestra una pantalla que
@@ -64,8 +65,7 @@ jobs:
           GOOGLE_DESKTOP_CLIENT_ID: ${{ secrets.GOOGLE_DESKTOP_CLIENT_ID }}
           GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
           MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
-        run: |
-          python3 -c "import json,os; json.dump({k: os.environ.get(k,'') for k in ['GOOGLE_WEB_CLIENT_ID','GOOGLE_DESKTOP_CLIENT_ID','GOOGLE_DESKTOP_CLIENT_SECRET','MICROSOFT_CLIENT_ID']}, open('env.json','w'))"
+        run: python3 tool/make_env.py
       - name: Configurar firma (si hay keystore)
         shell: bash
         env:
@@ -108,19 +108,13 @@ jobs:
           channel: ${{ env.FLUTTER_CHANNEL }}
           cache: true
       - name: Crear env.json desde los secretos
-        shell: pwsh
+        shell: bash
         env:
           GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
           GOOGLE_DESKTOP_CLIENT_ID: ${{ secrets.GOOGLE_DESKTOP_CLIENT_ID }}
           GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
           MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
-        run: |
-          @{
-            GOOGLE_WEB_CLIENT_ID = "$env:GOOGLE_WEB_CLIENT_ID"
-            GOOGLE_DESKTOP_CLIENT_ID = "$env:GOOGLE_DESKTOP_CLIENT_ID"
-            GOOGLE_DESKTOP_CLIENT_SECRET = "$env:GOOGLE_DESKTOP_CLIENT_SECRET"
-            MICROSOFT_CLIENT_ID = "$env:MICROSOFT_CLIENT_ID"
-          } | ConvertTo-Json | Set-Content -Encoding utf8NoBOM env.json
+        run: python tool/make_env.py
       - run: flutter pub get
       - run: flutter build windows --release --dart-define-from-file=env.json
       - name: Versión
