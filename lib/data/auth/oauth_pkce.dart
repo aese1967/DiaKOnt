@@ -8,6 +8,38 @@ import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
+/// Registro de los pasos del inicio de sesión. Si algo falla o se traba, el
+/// mensaje de error dice en qué paso quedó y el detalle queda en
+/// `%LOCALAPPDATA%\\DiaKont\\login.log` (Windows) para poder diagnosticarlo.
+class AuthLog {
+  AuthLog._();
+
+  static String step = '';
+
+  static void mark(String s) {
+    step = s;
+    _append(s);
+  }
+
+  static void error(Object e) => _append('ERROR en "$step": $e');
+
+  static void _append(String line) {
+    try {
+      if (!Platform.isWindows) return;
+      final base = Platform.environment['LOCALAPPDATA'];
+      if (base == null) return;
+      final dir = Directory('$base\\DiaKont')..createSync(recursive: true);
+      File('${dir.path}\\login.log').writeAsStringSync(
+        '${DateTime.now().toIso8601String()}  $line\n',
+        mode: FileMode.append,
+        flush: true,
+      );
+    } catch (_) {
+      /* el registro nunca debe romper el login */
+    }
+  }
+}
+
 /// Error de autenticación con mensaje listo para mostrar.
 class AuthFailure implements Exception {
   const AuthFailure(this.message);
@@ -94,6 +126,14 @@ class PkceOAuth {
 
   static final _rnd = Random.secure();
 
+  /// Permite al usuario abandonar un inicio de sesión en curso (por ejemplo,
+  /// si cerró el navegador sin terminar).
+  static Completer<void>? _cancel;
+  static void cancel() {
+    final c = _cancel;
+    if (c != null && !c.isCompleted) c.complete();
+  }
+
   static String _randomString(int length) {
     const chars =
         'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
@@ -108,6 +148,8 @@ class PkceOAuth {
       .replaceAll('=', '');
 
   static Future<OAuthTokens> authorize(OAuthConfig cfg) async {
+    AuthLog.mark('Preparando el inicio de sesión');
+    final cancel = _cancel = Completer<void>();
     final verifier = _randomString(64);
     final state = _randomString(24);
 
@@ -142,6 +184,7 @@ class PkceOAuth {
         );
         callback = Uri.parse(result);
       } else {
+        AuthLog.mark('Abriendo el navegador');
         final launched = await launchUrl(
           authUrl,
           mode: LaunchMode.externalApplication,
@@ -149,20 +192,51 @@ class PkceOAuth {
         if (!launched) {
           throw const AuthFailure('No se pudo abrir el navegador.');
         }
-        final request = await server
-            .firstWhere(
-              (r) =>
-                  r.uri.queryParameters.containsKey('code') ||
-                  r.uri.queryParameters.containsKey('error'),
-            )
-            .timeout(const Duration(minutes: 5));
+        AuthLog.mark('Esperando la respuesta del navegador');
+        // Se atienden todas las peticiones (el navegador también pide
+        // /favicon.ico y a veces abre conexiones de más): se responde a cada
+        // una y se cierra, para que ninguna quede colgada.
+        final got = Completer<HttpRequest>();
+        final sub = server.listen((r) {
+          final q = r.uri.queryParameters;
+          if (!got.isCompleted &&
+              (q.containsKey('code') || q.containsKey('error'))) {
+            got.complete(r);
+          } else {
+            r.response.statusCode = HttpStatus.noContent;
+            unawaited(r.response.close().catchError((_) {}));
+          }
+        });
+        final HttpRequest request;
+        try {
+          request = await Future.any<HttpRequest?>([
+            got.future,
+            cancel.future.then((_) => null),
+          ]).timeout(const Duration(minutes: 5)).then((r) {
+            if (r == null) {
+              throw const AuthFailure('Inicio de sesión cancelado.');
+            }
+            return r;
+          });
+        } finally {
+          await sub.cancel().timeout(
+            const Duration(seconds: 2),
+            onTimeout: () {},
+          );
+        }
         callback = request.uri;
         final ok = callback.queryParameters['code'] != null;
+        AuthLog.mark('Respuesta recibida (${ok ? 'con código' : 'sin código'})');
         request.response
           ..statusCode = 200
           ..headers.contentType = ContentType.html
+          ..headers.set(HttpHeaders.connectionHeader, 'close')
           ..write(_callbackPage(ok));
-        await request.response.close();
+        // No esperar indefinidamente a que el navegador cierre la conexión.
+        await request.response
+            .close()
+            .timeout(const Duration(seconds: 5), onTimeout: () {})
+            .catchError((_) {});
       }
 
       final params = callback.queryParameters;
@@ -175,6 +249,7 @@ class PkceOAuth {
           params['error_description'] ?? 'Inicio de sesión cancelado.',
         );
       }
+      AuthLog.mark('Canjeando el código por los permisos');
       return await _token(cfg, {
         'grant_type': 'authorization_code',
         'code': code,
@@ -182,9 +257,15 @@ class PkceOAuth {
         'code_verifier': verifier,
       });
     } on TimeoutException {
-      throw const AuthFailure('Se agotó el tiempo para iniciar sesión.');
+      throw AuthFailure(
+        'Se agotó el tiempo para iniciar sesión (${AuthLog.step}).',
+      );
     } finally {
-      await server?.close(force: true);
+      if (identical(_cancel, cancel)) _cancel = null;
+      await server
+          ?.close(force: true)
+          .timeout(const Duration(seconds: 2), onTimeout: () {})
+          .catchError((_) {});
     }
   }
 
@@ -201,17 +282,35 @@ class PkceOAuth {
     Map<String, String> body, {
     String? previousRefresh,
   }) async {
-    final res = await http.post(
-      Uri.parse(cfg.tokenEndpoint),
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: {
-        'client_id': cfg.clientId,
-        if (cfg.clientSecret != null && cfg.clientSecret!.isNotEmpty)
-          'client_secret': cfg.clientSecret!,
-        ...body,
-      },
-    );
-    final json = jsonDecode(res.body) as Map<String, dynamic>;
+    final http.Response res;
+    try {
+      res = await http
+          .post(
+            Uri.parse(cfg.tokenEndpoint),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: {
+              'client_id': cfg.clientId,
+              if (cfg.clientSecret != null && cfg.clientSecret!.isNotEmpty)
+                'client_secret': cfg.clientSecret!,
+              ...body,
+            },
+          )
+          .timeout(const Duration(seconds: 30));
+    } on TimeoutException {
+      throw const AuthFailure(
+        'El servidor de inicio de sesión no respondió. Revisá tu conexión '
+        '(o la VPN/antivirus) y probá de nuevo.',
+      );
+    } on SocketException catch (e) {
+      throw AuthFailure('Sin conexión con el servidor de inicio de sesión: '
+          '${e.message}');
+    }
+    final Map<String, dynamic> json;
+    try {
+      json = jsonDecode(res.body) as Map<String, dynamic>;
+    } on FormatException {
+      throw AuthFailure('Respuesta inesperada del servidor (${res.statusCode}).');
+    }
     if (res.statusCode != 200) {
       final err = json['error'] as String?;
       if (err == 'invalid_grant') {

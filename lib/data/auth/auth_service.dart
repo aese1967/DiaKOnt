@@ -172,17 +172,37 @@ class AuthService {
     }
 
     final tokens = await PkceOAuth.authorize(_googleDesktop);
+    AuthLog.mark('Leyendo los datos de la cuenta de Google');
     final claims = OAuthTokens.decodeJwtPayload(tokens.idToken ?? '');
+    final sub = claims['sub'] as String?;
+    if (sub == null) {
+      throw const AuthFailure('Google no devolvió los datos de la cuenta.');
+    }
     _tokens = tokens;
-    await _storage.write(key: _kRefresh, value: tokens.refreshToken);
+    await _save(_kRefresh, tokens.refreshToken);
     await _setAccount(
       CloudAccount(
         provider: CloudProvider.google,
-        id: claims['sub'] as String,
+        id: sub,
         email: (claims['email'] as String?) ?? '',
         name: claims['name'] as String?,
       ),
     );
+    AuthLog.mark('Sesión iniciada');
+  }
+
+  /// Guarda en el almacenamiento seguro sin poder trabar el login: si el
+  /// almacén no responde, la sesión sigue en memoria (habrá que volver a
+  /// entrar la próxima vez) y queda registrado.
+  Future<void> _save(String key, String? value) async {
+    AuthLog.mark('Guardando la sesión en el equipo ($key)');
+    try {
+      await _storage
+          .write(key: key, value: value)
+          .timeout(const Duration(seconds: 10));
+    } catch (e) {
+      AuthLog.error(e);
+    }
   }
 
   // ------------------------------------------------------------ Microsoft
@@ -199,7 +219,7 @@ class AuthService {
     }
     final j = jsonDecode(me.body) as Map<String, dynamic>;
     _tokens = tokens;
-    await _storage.write(key: _kRefresh, value: tokens.refreshToken);
+    await _save(_kRefresh, tokens.refreshToken);
     await _setAccount(
       CloudAccount(
         provider: CloudProvider.microsoft,
@@ -267,7 +287,7 @@ class AuthService {
   }
 
   Future<void> _setAccount(CloudAccount a) async {
-    await _storage.write(key: _kAccount, value: jsonEncode(a.toJson()));
+    await _save(_kAccount, jsonEncode(a.toJson()));
     _account = a;
     _ctrl.add(a);
   }

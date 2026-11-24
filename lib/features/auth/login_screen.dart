@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -6,7 +8,6 @@ import '../../core/theme/app_theme.dart';
 import '../../data/auth/oauth_pkce.dart';
 import '../../state/providers.dart';
 import '../../widgets/brand_logo.dart';
-import '../../widgets/common.dart';
 
 /// Pantalla de ingreso con Google o Microsoft.
 ///
@@ -29,13 +30,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       await action();
     } on AuthFailure catch (e) {
-      if (mounted) showSnack(context, e.message);
+      AuthLog.error(e);
+      if (mounted && e.message != 'Inicio de sesión cancelado.') {
+        await _showError(e.message);
+      }
     } catch (e) {
-      if (mounted) showSnack(context, 'No se pudo iniciar sesión: $e');
+      AuthLog.error(e);
+      if (mounted) {
+        await _showError('$e\n\nPaso: ${AuthLog.step}');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
+
+  Future<void> _showError(String message) => showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('No se pudo iniciar sesión'),
+      content: SelectableText(message),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('Entendido'),
+        ),
+      ],
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -99,7 +120,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 onPressed: () => _run(auth.signInWithMicrosoft),
               ),
             const SizedBox(height: 24),
-            if (_busy) const Center(child: CircularProgressIndicator()),
+            if (_busy) ...[
+              const Center(child: CircularProgressIndicator()),
+              if (!Platform.isAndroid) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Terminá el ingreso en el navegador y volvé a esta ventana.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: muted),
+                ),
+                Center(
+                  child: TextButton(
+                    onPressed: () {
+                      PkceOAuth.cancel();
+                      setState(() => _busy = false);
+                    },
+                    child: const Text('Cancelar'),
+                  ),
+                ),
+              ],
+            ],
             const SizedBox(height: 12),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
