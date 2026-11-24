@@ -45,6 +45,7 @@ CHECKS = {
 
 
 def main() -> int:
+    sys.stdout.reconfigure(encoding="utf-8")
     env = {}
     errors = []
     for key in KEYS:
