@@ -193,50 +193,7 @@ class PkceOAuth {
           throw const AuthFailure('No se pudo abrir el navegador.');
         }
         AuthLog.mark('Esperando la respuesta del navegador');
-        // Se atienden todas las peticiones (el navegador también pide
-        // /favicon.ico y a veces abre conexiones de más): se responde a cada
-        // una y se cierra, para que ninguna quede colgada.
-        final got = Completer<HttpRequest>();
-        final sub = server.listen((r) {
-          final q = r.uri.queryParameters;
-          if (!got.isCompleted &&
-              (q.containsKey('code') || q.containsKey('error'))) {
-            got.complete(r);
-          } else {
-            r.response.statusCode = HttpStatus.noContent;
-            unawaited(r.response.close().catchError((_) {}));
-          }
-        });
-        final HttpRequest request;
-        try {
-          request = await Future.any<HttpRequest?>([
-            got.future,
-            cancel.future.then((_) => null),
-          ]).timeout(const Duration(minutes: 5)).then((r) {
-            if (r == null) {
-              throw const AuthFailure('Inicio de sesión cancelado.');
-            }
-            return r;
-          });
-        } finally {
-          await sub.cancel().timeout(
-            const Duration(seconds: 2),
-            onTimeout: () {},
-          );
-        }
-        callback = request.uri;
-        final ok = callback.queryParameters['code'] != null;
-        AuthLog.mark('Respuesta recibida (${ok ? 'con código' : 'sin código'})');
-        request.response
-          ..statusCode = 200
-          ..headers.contentType = ContentType.html
-          ..headers.set(HttpHeaders.connectionHeader, 'close')
-          ..write(_callbackPage(ok));
-        // No esperar indefinidamente a que el navegador cierre la conexión.
-        await request.response
-            .close()
-            .timeout(const Duration(seconds: 5), onTimeout: () {})
-            .catchError((_) {});
+        callback = await waitForLoopbackCallback(server, cancel: cancel.future);
       }
 
       final params = callback.queryParameters;
@@ -262,10 +219,67 @@ class PkceOAuth {
       );
     } finally {
       if (identical(_cancel, cancel)) _cancel = null;
-      await server
-          ?.close(force: true)
-          .timeout(const Duration(seconds: 2), onTimeout: () {})
-          .catchError((_) {});
+      if (server != null) {
+        await _quiet(server.close(force: true), const Duration(seconds: 2));
+      }
+    }
+  }
+
+  /// Espera en el servidor local (loopback) la vuelta del navegador con el
+  /// código, le responde una página de "listo" y devuelve la URL recibida.
+  ///
+  /// Se atienden todas las peticiones (el navegador también pide
+  /// /favicon.ico y a veces abre conexiones de más): se responde a cada una y
+  /// se cierra, para que ninguna quede colgada. Ningún paso puede esperar
+  /// para siempre.
+  static Future<Uri> waitForLoopbackCallback(
+    HttpServer server, {
+    Future<void>? cancel,
+    Duration timeout = const Duration(minutes: 5),
+  }) async {
+    final got = Completer<HttpRequest>();
+    final sub = server.listen((r) {
+      final q = r.uri.queryParameters;
+      if (!got.isCompleted &&
+          (q.containsKey('code') || q.containsKey('error'))) {
+        got.complete(r);
+      } else {
+        r.response.statusCode = HttpStatus.noContent;
+        unawaited(_quiet(r.response.close(), const Duration(seconds: 2)));
+      }
+    });
+    try {
+      final request = await Future.any<HttpRequest?>([
+        got.future,
+        if (cancel != null) cancel.then((_) => null),
+      ]).timeout(timeout);
+      if (request == null) {
+        throw const AuthFailure('Inicio de sesión cancelado.');
+      }
+      final callback = request.uri;
+      final ok = callback.queryParameters['code'] != null;
+      AuthLog.mark('Respuesta recibida (${ok ? 'con código' : 'sin código'})');
+      request.response
+        ..statusCode = 200
+        ..headers.contentType = ContentType.html
+        ..headers.set(HttpHeaders.connectionHeader, 'close')
+        ..write(_callbackPage(ok));
+      // No esperar indefinidamente a que el navegador cierre la conexión.
+      await _quiet(request.response.close(), const Duration(seconds: 5));
+      return callback;
+    } finally {
+      await _quiet(sub.cancel(), const Duration(seconds: 2));
+    }
+  }
+
+  /// Espera [f] como máximo [limit] e ignora su resultado y sus errores.
+  /// (Sin `onTimeout`: los futuros de dart:io tienen tipos concretos, como
+  /// `Future<ServerSocket>`, y un `onTimeout` que devuelve null falla.)
+  static Future<void> _quiet(Future<Object?> f, Duration limit) async {
+    try {
+      await f.timeout(limit);
+    } catch (_) {
+      /* a propósito: cierre de mejor esfuerzo */
     }
   }
 
