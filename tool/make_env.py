@@ -8,10 +8,15 @@ cliente"). Así nunca se publica una versión con el login roto.
 No imprime los valores: solo dice qué campo está mal.
 """
 
+from __future__ import annotations
+
 import json
 import os
 import re
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 
 KEYS = [
     "GOOGLE_WEB_CLIENT_ID",
@@ -44,6 +49,46 @@ CHECKS = {
 }
 
 
+def check_google_desktop_pair(client_id: str, secret: str) -> str | None:
+    """Pregunta a Google si el par ID + secreto existe, con un código falso.
+
+    Con el par correcto Google responde `invalid_grant` (el código es falso);
+    con un secreto que no es de ese cliente responde `invalid_client`.
+    Devuelve el mensaje de error o None si está bien (o si no hay red).
+    """
+    data = urllib.parse.urlencode(
+        {
+            "client_id": client_id,
+            "client_secret": secret,
+            "grant_type": "authorization_code",
+            "code": "verificacion-ci",
+            "redirect_uri": "http://localhost",
+        }
+    ).encode()
+    try:
+        urllib.request.urlopen(
+            "https://oauth2.googleapis.com/token", data=data, timeout=20
+        )
+        return None
+    except urllib.error.HTTPError as e:
+        try:
+            body = json.loads(e.read().decode("utf-8"))
+        except Exception:
+            body = {}
+        if body.get("error") == "invalid_client":
+            return (
+                "Google rechaza el par GOOGLE_DESKTOP_CLIENT_ID + "
+                "GOOGLE_DESKTOP_CLIENT_SECRET ("
+                + str(body.get("error_description", "invalid_client"))
+                + "). El secreto tiene que ser el del MISMO cliente "
+                "'App de escritorio'."
+            )
+        return None
+    except Exception as e:  # sin red: no bloquear la build
+        print(f"::warning::No se pudo verificar el secreto con Google: {e}")
+        return None
+
+
 def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8")
     env = {}
@@ -67,6 +112,12 @@ def main() -> int:
             "::error::GOOGLE_WEB_CLIENT_ID y GOOGLE_DESKTOP_CLIENT_ID son iguales: "
             "tienen que ser dos clientes distintos (Aplicación web y App de escritorio)."
         )
+    if not errors and env["GOOGLE_DESKTOP_CLIENT_ID"]:
+        problem = check_google_desktop_pair(
+            env["GOOGLE_DESKTOP_CLIENT_ID"], env["GOOGLE_DESKTOP_CLIENT_SECRET"]
+        )
+        if problem:
+            errors.append(f"::error::{problem}")
     for line in errors:
         print(line)
     if errors:
